@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fan Curve Controller</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .chart-container { width: 80%; max-width: 600px; margin: 20px auto; }
+        button { margin: 5px; padding: 5px 10px; }
+        #wifi-form { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="tabs">
+        <button onclick="openTab(event, 'fan1')">Fan 1</button>
+        <button onclick="openTab(event, 'fan2')">Fan 2</button>
+        <button onclick="openTab(event, 'fan3')">Fan 3</button>
+    </div>
+
+    <div id="fan1" class="tab-content">
+        <div class="chart-container"><canvas id="fanChart1"></canvas></div>
+    </div>
+
+    <div id="fan2" class="tab-content">
+        <div class="chart-container"><canvas id="fanChart2"></canvas></div>
+    </div>
+
+    <div id="fan3" class="tab-content">
+        <div class="chart-container"><canvas id="fanChart3"></canvas></div>
+    </div>
+
+    <button onclick="sendAllData()">Send All Data</button>
+
+    <div id="wifi-form">
+        <h3>Change WiFi Password</h3>
+        <input type="password" id="new-password" placeholder="New WiFi Password">
+        <button onclick="changeWifiPassword()">Change Password</button>
+    </div>
+
+    <script>
+        let charts = [];
+
+        function initChart(canvasId, fanNumber) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [30, 40, 50, 60, 70, 80, 90, 100, 110],
+                    datasets: [{
+                        label: `Fan ${fanNumber} Speed %`,
+                        data: [0, 10, 40, 50, 60, 65, 65, 70, 70],
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Speed %'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Temperature °C'
+                            }
+                        }
+                    },
+                    plugins: {
+                        dragData: {
+                            round: 1,
+                            showTooltip: true,
+                            onDrag: function(e, datasetIndex, index, value) {
+                                e.target.style.cursor = 'grabbing';
+                            },
+                            onDragEnd: function(e, datasetIndex, index, value) {
+                                e.target.style.cursor = 'default';
+                            },
+                        }
+                    }
+                }
+            });
+            charts.push(chart);
+        }
+
+        function openTab(evt, tabName) {
+            const tabContents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].className = tabContents[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).className += " active";
+        }
+
+        function sendAllData() {
+            const allData = charts.map((chart, index) => ({
+                fan: index + 1,
+                data: chart.data.datasets[0].data
+            }));
+
+            fetch('/update_all_fans', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(allData),
+            })
+            .then(response => response.json())
+            .then(data => console.log('Success:', data))
+            .catch((error) => console.error('Error:', error));
+        }
+
+        function changeWifiPassword() {
+            const newPassword = document.getElementById('new-password').value;
+            fetch('/change_wifi_password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({password: newPassword}),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Password change:', data);
+                alert(data.message);
+            })
+            .catch((error) => console.error('Error:', error));
+        }
+
+        initChart('fanChart1', 1);
+        initChart('fanChart2', 2);
+        initChart('fanChart3', 3);
+        openTab(null, 'fan1');
+    </script>
+</body>
+</html>
